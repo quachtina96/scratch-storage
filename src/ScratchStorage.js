@@ -2,6 +2,7 @@ const log = require('./log');
 
 const BuiltinHelper = require('./BuiltinHelper');
 const WebHelper = require('./WebHelper');
+const LocalStorageHelper = require('./LocalStorageHelper');
 
 const _Asset = require('./Asset');
 const _AssetType = require('./AssetType');
@@ -13,6 +14,7 @@ class ScratchStorage {
 
         this.builtinHelper = new BuiltinHelper(this);
         this.webHelper = new WebHelper(this);
+        this.localStorageHelper = new LocalStorageHelper(this);
         this.builtinHelper.registerDefaultAssets(this);
 
         this._helpers = [
@@ -22,6 +24,10 @@ class ScratchStorage {
             },
             {
                 helper: this.webHelper,
+                priority: -100
+            },
+            {
+                helper: this.localStorageHelper,
                 priority: -100
             }
         ];
