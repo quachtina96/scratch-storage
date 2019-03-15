@@ -1,3 +1,7 @@
+/**
+ * @fileoverview define the LocalStorageHelper which stores to and loads from
+ * indexedDB.
+ */
 const nets = require('nets');
 
 const log = require('./log');
@@ -5,13 +9,9 @@ const log = require('./log');
 const Asset = require('./Asset');
 const Helper = require('./Helper');
 
-const openDb = require('idb').openDb;
-const deleteDb = require('idb').deleteDb;
-
-// Notes from Tina:
-// Because I'm looking to only store sound recordings...
-// I'm not sure I even need a list of stores.
-// For now, i'll use a single store.
+const idb = require('idb');
+const openDb = idb.openDb;
+const deleteDb = idb.deleteDb;
 
 class LocalStorageHelper extends Helper {
   constructor (parent) {
@@ -25,66 +25,72 @@ class LocalStorageHelper extends Helper {
        * @property {UrlFunction} createFunction - A function which computes a URL from an Asset.
        * @property {UrlFunction} updateFunction - A function which computes a URL from an Asset.
        */
-      this.store = [];
+      this.stores = [];
       this.dbPromise = this.openAndUpgradeDatabase();
   }
 
+  /**
+   * This method gets called everytime you want to update the database
+   * @param {Integer} version of update to execute
+   */
   openAndUpgradeDatabase(upgradeDb) {
-    return idb.open('custom-assets', 1, function(upgradeDb) {
-      switch (upgradeDb.oldVersion) {
+    return openDb('custom-assets', 3, upgradeDB => {
+      switch (upgradeDB.oldVersion) {
         case 0:
-          // a placeholder case so that the switch block will
-          // execute when the database is first created
-          // (oldVersion is 0)
-        case 1: // TODO(quacht): What's the point of breaking this up into cases?
-          console.log('Creating the recordings object store');
-          upgradeDb.createObjectStore('recordings', {keyPath: 'id'});
-
-        // 4.1 - create 'name' index
+          //nothing
         case 2:
-          console.log('Creating a name index');
-          var store = upgradeDb.transaction.objectStore('products');
-          store.createIndex('name', 'name', {unique: true});
-
-        // 4.2 - create 'price' and 'description' indexes
+          upgradeDB.createObjectStore('sound-recordings', {keyPath: 'assetId'});
         case 3:
-          console.log('Create description indexes');
-          var store = upgradeDb.transaction.objectStore('products');
-          store.createIndex('description', 'description');
+          upgradeDB.createObjectStore('recordings', {keyPath: 'id', autoincrement: true});
       }
     });
   }
 
 
 	loadByAssetId (assetId) {
-    return dbPromise.then(function(db) {
-      var tx = db.transaction('recordings', 'readonly');
-      var store = tx.objectStore('recordings');
+    return this.dbPromise.then(function(db) {
+      var tx = db.transaction('sound-recordings', 'readonly');
+      var store = tx.objectStore('sound-recordings');
       var index = store.index('assetId');
       return index.get(assetId);
     });
   }
 
 	store (assetType, dataFormat, data, assetId) {
-    const asset = new Asset(assetType, assetId, dataFormat);
+    const asset = new Asset(assetType, assetId, dataFormat, data);
 
-    dbPromise.then(function(db) {
-      var tx = db.transaction('recordings', 'readwrite');
-      var store = tx.objectStore('recordings');
+    this.dbPromise.then(function(db) {
+      var tx = db.transaction('sound-recordings', 'readwrite');
+      var store = tx.objectStore('sound-recordings');
 
-      // TODO(quacht): Can I directly store an Asset or does it need to be represented as a basic
-      // javascript object?
       var items = [asset];
       return Promise.all(items.map(function(item) {
-          console.log('Adding item: ', item);
+          console.log('LocalStorageHelper adding item: ', item);
           return store.add(item);
         })
       ).catch(function(e) {
         tx.abort();
         console.log(e);
       }).then(function() {
-        console.log('added recording successfully!');
+        console.log('LocalStorageHelper added recording successfully!');
       });
+    });
+  }
+
+  /**
+   * Fetch an asset but don't process dependencies.
+   * @param {AssetType} assetType - The type of asset to fetch.
+   * @param {string} assetId - The ID of the asset to fetch: a project ID, MD5, etc.
+   * @param {DataFormat} dataFormat - The file format / file extension of the asset to fetch: PNG, JPG, etc.
+   * @return {Promise.<Asset>} A promise for the contents of the asset.
+   */
+  load (assetType, assetId, dataFormat) {
+    return this.dbPromise.then(function(db) {
+      var tx = db.transaction('sound-recordings', 'readonly');
+      var store = tx.objectStore('sound-recordings');
+      var result = store.get(assetId);
+      return result
+    });
   }
 }
 

@@ -236,16 +236,21 @@ class ScratchStorage {
      * @param {?string} [assetId] - The ID of the asset to fetch: a project ID, MD5, etc.
      * @return {Promise.<object>} A promise for asset metadata
      */
-    store (assetType, dataFormat, data, assetId) {
+    store (assetType, dataFormat, data, assetId, isRecording=false) {
         dataFormat = dataFormat || assetType.runtimeFormat;
         return new Promise(
-            (resolve, reject) =>
-                this.webHelper.store(assetType, dataFormat, data, assetId)
-                    .then(body => {
-                        this.builtinHelper._store(assetType, dataFormat, data, body.id);
-                        return resolve(body);
-                    })
-                    .catch(error => reject(error))
+            (resolve, reject) => {
+                if (isRecording) {
+                    resolve(this.localStorageHelper.store(assetType, dataFormat, data, assetId));
+                } else {
+                    this.webHelper.store(assetType, dataFormat, data, assetId)
+                        .then(body => {
+                            this.builtinHelper._store(assetType, dataFormat, data, body.id);
+                            return resolve(body);
+                        })
+                        .catch(error => reject(error))
+                }
+            }
         );
     }
 }
