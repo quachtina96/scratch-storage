@@ -34,46 +34,45 @@ class LocalStorageHelper extends Helper {
    * @param {Integer} version of update to execute
    */
   openAndUpgradeDatabase(upgradeDb) {
-    return openDb('custom-assets', 3, upgradeDB => {
+    return openDb('custom-assets', 4, upgradeDB => {
       switch (upgradeDB.oldVersion) {
         case 0:
           //nothing
         case 2:
           upgradeDB.createObjectStore('sound-recordings', {keyPath: 'assetId'});
         case 3:
-          upgradeDB.createObjectStore('recordings', {keyPath: 'id', autoincrement: true});
+          // upgradeDB.createObjectStore('recordings', {keyPath: 'id', autoincrement: true});
+        case 4:
+          upgradeDB.createObjectStore('vmSounds', {keyPath: 'name'});
       }
     });
   }
 
-
-	loadByAssetId (assetId) {
-    return this.dbPromise.then(function(db) {
-      var tx = db.transaction('sound-recordings', 'readonly');
-      var store = tx.objectStore('sound-recordings');
-      var index = store.index('assetId');
-      return index.get(assetId);
-    });
-  }
-
-	store (assetType, dataFormat, data, assetId) {
+	store (assetType, dataFormat, data, assetId, vmSound) {
     const asset = new Asset(assetType, assetId, dataFormat, data);
 
-    this.dbPromise.then(function(db) {
+    return this.dbPromise.then(function(db) {
+      var vmSoundsTx = db.transaction('vmSounds', 'readwrite');
       var tx = db.transaction('sound-recordings', 'readwrite');
-      var store = tx.objectStore('sound-recordings');
 
-      var items = [asset];
-      return Promise.all(items.map(function(item) {
-          console.log('LocalStorageHelper adding item: ', item);
-          return store.add(item);
-        })
-      ).catch(function(e) {
-        tx.abort();
+      try {
+        var vmSoundsStore = vmSoundsTx.objectStore('vmSounds');
+        vmSoundsStore.add(vmSound).then(function() {
+          console.log('LocalStorageHelper added vmsound successfully!');
+        });
+      } catch (e) {
         console.log(e);
-      }).then(function() {
-        console.log('LocalStorageHelper added recording successfully!');
-      });
+        vmSoundsTx.abort();
+      }
+
+      try {
+        var store = tx.objectStore('sound-recordings');
+        store.add(asset).then(function() {
+          console.log('LocalStorageHelper added recording successfully!');
+        });
+      } catch (e) {
+        console.log(e);
+      }
     });
   }
 
@@ -90,6 +89,51 @@ class LocalStorageHelper extends Helper {
       var store = tx.objectStore('sound-recordings');
       var result = store.get(assetId);
       return result
+    });
+  }
+
+  /**
+   * Fetch an asset but don't process dependencies.
+   * @param {string} soundName - The name of the vm sound recording to fetch.
+   * @return {Promise.<Asset>} A promise for the contents of the asset.
+   */
+  loadVmSound (soundName) {
+    return this.dbPromise.then(function(db) {
+      var tx = db.transaction('vmSounds', 'readonly');
+      var store = tx.objectStore('vmSounds');
+      return store.get(soundName);
+    });
+  }
+
+  deleteVmSound (soundName) {
+    return this.dbPromise.then(function(db) {
+      var vmSoundsTx = db.transaction('vmSounds', 'readwrite');
+
+      try {
+        var vmSoundsStore = vmSoundsTx.objectStore('vmSounds');
+        vmSoundsStore.delete(soundName).then(function() {
+          console.log(`LocalStorageHelper deleted vmsound called ${soundName}!`);
+        });
+      } catch (e) {
+        console.log(e);
+        vmSoundsTx.abort();
+      }
+    });
+  }
+
+  storeVmSound (vmSound) {
+    return this.dbPromise.then(function(db) {
+      var vmSoundsTx = db.transaction('vmSounds', 'readwrite');
+
+      try {
+        var vmSoundsStore = vmSoundsTx.objectStore('vmSounds');
+        vmSoundsStore.add(vmSound).then(function() {
+          console.log('LocalStorageHelper added vmsound successfully!');
+        });
+      } catch (e) {
+        console.log(e);
+        vmSoundsTx.abort();
+      }
     });
   }
 }
