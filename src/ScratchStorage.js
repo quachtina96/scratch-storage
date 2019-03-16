@@ -234,14 +234,16 @@ class ScratchStorage {
      * @param {?DataFormat} [dataFormat] - Optional: load this format instead of the AssetType's default.
      * @param {Buffer} data - Data to store for the asset
      * @param {?string} [assetId] - The ID of the asset to fetch: a project ID, MD5, etc.
+     * @param {?Object} opt_vmSound - the sound object providing metadata about the asset being stored.
      * @return {Promise.<object>} A promise for asset metadata
      */
-    store (assetType, dataFormat, data, assetId, isRecording=false) {
+    store (assetType, dataFormat, data, assetId, opt_vmSound) {
         dataFormat = dataFormat || assetType.runtimeFormat;
         return new Promise(
             (resolve, reject) => {
-                if (isRecording) {
-                    resolve(this.localStorageHelper.store(assetType, dataFormat, data, assetId));
+                if (opt_vmSound) {
+                    // We should be using the localStorageHelpder
+                    resolve(this.localStorageHelper.store(assetType, dataFormat, data, assetId, opt_vmSound));
                 } else {
                     this.webHelper.store(assetType, dataFormat, data, assetId)
                         .then(body => {
