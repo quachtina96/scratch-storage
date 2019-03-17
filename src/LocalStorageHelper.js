@@ -136,6 +136,20 @@ class LocalStorageHelper extends Helper {
       }
     });
   }
+
+  getAllRecordings() {
+    return this.dbPromise.then(function(db) {
+      var vmSoundsTx = db.transaction('vmSounds', 'readonly');
+
+      try {
+        var vmSoundsStore = vmSoundsTx.objectStore('vmSounds');
+        return vmSoundsStore.getAllKeys();
+      } catch (e) {
+        console.log(e);
+        vmSoundsTx.abort();
+      }
+    });
+  }
 }
 
 module.exports = LocalStorageHelper;
