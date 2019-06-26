@@ -2,6 +2,7 @@ const log = require('./log');
 
 const BuiltinHelper = require('./BuiltinHelper');
 const WebHelper = require('./WebHelper');
+const LocalStorageHelper = require('./LocalStorageHelper');
 
 const _Asset = require('./Asset');
 const _AssetType = require('./AssetType');
@@ -13,6 +14,7 @@ class ScratchStorage {
 
         this.builtinHelper = new BuiltinHelper(this);
         this.webHelper = new WebHelper(this);
+        this.localStorageHelper = new LocalStorageHelper(this);
         this.builtinHelper.registerDefaultAssets(this);
 
         this._helpers = [
@@ -22,6 +24,10 @@ class ScratchStorage {
             },
             {
                 helper: this.webHelper,
+                priority: -100
+            },
+            {
+                helper: this.localStorageHelper,
                 priority: -100
             }
         ];
@@ -216,18 +222,25 @@ class ScratchStorage {
      * @param {?DataFormat} [dataFormat] - Optional: load this format instead of the AssetType's default.
      * @param {Buffer} data - Data to store for the asset
      * @param {?string} [assetId] - The ID of the asset to fetch: a project ID, MD5, etc.
+     * @param {?Object} opt_vmSound - the sound object providing metadata about the asset being stored.
      * @return {Promise.<object>} A promise for asset metadata
      */
-    store (assetType, dataFormat, data, assetId) {
+    store (assetType, dataFormat, data, assetId, opt_vmSound) {
         dataFormat = dataFormat || assetType.runtimeFormat;
         return new Promise(
-            (resolve, reject) =>
-                this.webHelper.store(assetType, dataFormat, data, assetId)
-                    .then(body => {
-                        this.builtinHelper._store(assetType, dataFormat, data, body.id);
-                        return resolve(body);
-                    })
-                    .catch(error => reject(error))
+            (resolve, reject) => {
+                if (opt_vmSound) {
+                    // We should be using the localStorageHelpder
+                    resolve(this.localStorageHelper.store(assetType, dataFormat, data, assetId, opt_vmSound));
+                } else {
+                    this.webHelper.store(assetType, dataFormat, data, assetId)
+                        .then(body => {
+                            this.builtinHelper._store(assetType, dataFormat, data, body.id);
+                            return resolve(body);
+                        })
+                        .catch(error => reject(error))
+                }
+            }
         );
     }
 }
